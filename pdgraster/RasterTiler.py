@@ -176,6 +176,7 @@ class RasterTiler():
             morecantile.Tile or None
                 The tile that was rasterized or None if there was an error.
         """
+        # if first rasterization attempt fails, try again
         for attempt in range(1):
             try:
 
@@ -221,13 +222,14 @@ class RasterTiler():
                 return tile
 
             except Exception as e:
-                logger.info(f'Error rasterizing {path} for tile {tile} due to error {e} so trying again.')
+                logger.info(f'Error rasterizing {path} for tile {tile}'
+                            f' on first try due to Error:\t\n{e}, trying again.')
 
             else:
                 break
                 
         else:
-            message = f'Error rasterizing {path} for tile {tile}, ran out of retries.'
+            message = f'Error rasterizing {path} for tile {tile} on second try.'
             self.__end_tracking(id, tile=tile, message=message)
             return None
 
