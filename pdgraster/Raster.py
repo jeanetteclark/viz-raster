@@ -1,10 +1,13 @@
 import warnings
 import os
 import uuid
+import logging
+from . import logging_config
 
 import numpy as np
 import geopandas as gpd
 import pandas as pd
+import pdgstaging
 from shapely.geometry import box
 
 import rasterio
@@ -12,6 +15,7 @@ from rasterio.io import MemoryFile
 from rasterio.merge import merge
 from rasterio.warp import reproject, Resampling
 
+logger = logging_config.logger
 
 class Raster():
     """
@@ -55,7 +59,7 @@ class Raster():
 
     def __init__(self):
         """
-            Initialize a Raster object.
+            Initialize a Raster object.            
         """
 
         # Set random names for properties that will be created temporarily
@@ -85,13 +89,15 @@ class Raster():
                 'name': 'polygon_count',
                 'weight_by': 'count',
                 'property': 'centroids_per_pixel',
-                'aggregation_method': 'sum'
+                'aggregation_method': 'sum',
+                'nodata_val': 0,
             },
             {
                 'name': 'coverage',
                 'weight_by': 'area',
                 'property': 'area_per_pixel_area',
-                'aggregation_method': 'sum'
+                'aggregation_method': 'sum',
+                'nodata_val': 0,
             }
         ]
 
@@ -171,6 +177,9 @@ class Raster():
                         property in the cell. Method can be any method allowed
                         in the 'func' property of the panda's aggregate method,
                         e.g. 'sum', 'count', 'mean', etc.
+                    nodata_val : int, float, None, or np.nan
+                        The value to apply to cells with no data. This is 
+                        pulled from the config. Default is 0.
 
             Returns
             -------
@@ -188,7 +197,7 @@ class Raster():
         r.__set_and_check_gdf(vector)
         r.__set_grid()
         r.__calculate_stats()
-        mem_file = r.__create_raster_from_stats_df()
+        mem_file = r.__create_raster_from_stats_df(nodata_val = stats[0]['nodata_val'])
 
         # Reset the properties saved to this class during the above processing
         # steps
@@ -696,9 +705,15 @@ class Raster():
 
         return area_gdf
 
-    def __create_raster_from_stats_df(self):
+    def __create_raster_from_stats_df(self, nodata_val = 0):
         """
             Create a raster in memory from the stats_df.
+
+            Parameters
+            ----------
+            nodata_val : int, float, None, or np.nan
+                Data to use in array cells with no data. This value is
+                pulled from the config. Default is 0.
 
             Returns
             -------
@@ -727,7 +742,9 @@ class Raster():
         # arrays are in the same order as that stats config
         stats_dict = {}
         for column_name in values_columns:
-            stats_dict[column_name] = self.__as_array(stats_df, column_name)
+            stats_dict[column_name] = self.__as_array(stats_df, 
+                                                      column_name, 
+                                                      nodata_val = nodata_val)
 
         stats_names_ordered = [x['name'] for x in self.stats]
         # count is the number of arrays in the stats dict == the number of
@@ -765,12 +782,13 @@ class Raster():
     def __as_array(
         self,
         df=None,
-        values_column=None
+        values_column=None,
+        nodata_val = 0
     ):
         """
             Convert a dataframe into a 2D array that is the size of the grid
             specified in this class. Grid cells without any data will be filled
-            with 0.
+            with the nodata_val specified in the config.
 
             Parameters
             ----------
@@ -804,9 +822,10 @@ class Raster():
             names=[ri, ci],
         )
 
+        logger.info(f"Creating array using no data value:{nodata_val}")
         a = (
             df.set_index([ri, ci])[values_column]
-            .reindex(all_indices, fill_value=0)
+            .reindex(all_indices, fill_value=nodata_val)
             .sort_index()
             .values.reshape((n_rows, n_cols))
         )
