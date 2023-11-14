@@ -90,14 +90,14 @@ class Raster():
                 'weight_by': 'count',
                 'property': 'centroids_per_pixel',
                 'aggregation_method': 'sum',
-                'nodata_val': 0,
+                'nodata_val': np.nan,
             },
             {
                 'name': 'coverage',
                 'weight_by': 'area',
                 'property': 'area_per_pixel_area',
                 'aggregation_method': 'sum',
-                'nodata_val': 0,
+                'nodata_val': np.nan,
             }
         ]
 
@@ -705,7 +705,7 @@ class Raster():
 
         return area_gdf
 
-    def __create_raster_from_stats_df(self, nodata_val = 0):
+    def __create_raster_from_stats_df(self, nodata_val = np.nan):
         """
             Create a raster in memory from the stats_df.
 
@@ -783,7 +783,7 @@ class Raster():
         self,
         df=None,
         values_column=None,
-        nodata_val = 0
+        nodata_val = np.nan
     ):
         """
             Convert a dataframe into a 2D array that is the size of the grid

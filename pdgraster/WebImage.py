@@ -2,9 +2,12 @@ import os
 
 from PIL import Image
 import numpy as np
+import logging
+from . import logging_config
 
 from . import Palette
 
+logger = logging_config.logger
 
 class WebImage():
     """
@@ -96,9 +99,25 @@ class WebImage():
         rgba_list = self.rgba_list
         height = self.height
         width = self.width
+        # insert fix made in PR for PDL data
+        #image_data = image_data.astype(float)
+
+        # check for np.NaN in the array initially
+        if np.isnan(image_data).any():
+            nan_sum_start = np.isnan(image_data).sum()
+            logger.info(f"Sum of np.Nan values found in image_data at start is {nan_sum_start}.")
+        else:
+            logger.info("NO np.Nan values are in image_data at start.")
+
+        # create a boolean mask with T when a value is the nodata_val
+        # and F when the value is not the nodata_val
         no_data_mask = image_data == nodata_val
+        logger.info(f"True values in no_data_mask is {np.sum(no_data_mask)}")
 
         # set the nodata value to np.nan
+        # purpose: in case the nodata value is a number, like 999, 
+        #           this allows us to execute the next steps of scaling actual data 
+        #           values to 0-255 without scaling the nodata values to this range 
         if(len(no_data_mask)):
             image_data[no_data_mask] = np.nan
         # convert the array from min to max to 0 to 255, and set the nodata
@@ -106,14 +125,38 @@ class WebImage():
         # will be set to max_val.
         image_data[image_data < min_val] = min_val
         image_data[image_data > max_val] = max_val
+
+        logger.info(f"Unique values in image_data before scaling is:\n{np.unique(image_data)}")
         image_data_scaled = (image_data - min_val) * \
             (255 / (max_val - min_val))
+        #logger.info(f"image_data_scaled is {image_data_scaled}")
+
+        # make all the no data values 256, which is out of the range of 
+        # the scaled 0-255 values
         image_data_scaled[no_data_mask] = 256
+        # count number of values that are 256
+        sum_of_256 = np.sum(image_data_scaled[image_data_scaled == 256])
+        logger.info(f"Sum of values that are 256: {sum_of_256}")
+
+        # check for np.NaN and None in the image_data_scaled
+        if np.isnan(image_data_scaled).any():
+            nan_sum = np.isnan(image_data_scaled).sum()
+            logger.info(f"Sum of np.Nan values found in image_data_scaled is {nan_sum}.")
+        else:
+            logger.info("NO np.Nan values are in image_data_scaled.")
+
+        if None in image_data_scaled:
+            none_sum = sum(x is None for x in image_data_scaled)
+            logger.info(f"Sum of None values found in image_data_scaled is {none_sum}.")
+        else:
+            logger.info("NO None values are in image_data_scaled.")
+
+        logger.info("Converting scaled values to integers...")
         image_data_scaled = image_data_scaled.astype(int)
 
         # replace each value in the matrix with the corresponding color in the
-        # list of rgba values. palette. The list consists of 256 RGBA values,
-        # plus a 257th value for the nodata color.
+        # list of Red/Green/Blue/Alpha values palette. The list consists of 256 
+        # RGBA values, plus a 257th value for the nodata color.
         rgba_data = [rgba_list[i] for i in image_data_scaled.flat]
         # reshape
         rgba_data = np.reshape(rgba_data, (height, width, 4))
