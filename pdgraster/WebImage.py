@@ -22,7 +22,7 @@ class WebImage():
         palette=Palette(['#663399', '#ffcc00'], '#ffffff00'),
         min_val=None,
         max_val=None,
-        nodata_val=None
+        nodata_val=0
     ):
         """
             Create a WebImage object.
@@ -50,7 +50,7 @@ class WebImage():
             nodata_val : any, optional
                 Set a value that will be treated as missing data or no data.
                 Pixels with this value will be set to the nodata color that is
-                specified in the palette. If not set, None will be used.
+                specified in the palette. If not set, 0 will be used.
         """
 
         # Calculate the min and max values if they are not provided
@@ -71,6 +71,8 @@ class WebImage():
         self.nodata_val = nodata_val
         if isinstance(palette, (list, tuple)):
             palette = Palette(*palette)
+            logger.info(f"1. Palette is {palette}")
+        logger.info(f"2. Palette is {palette}")
         self.rgba_list = palette.rgba_list
         self.image_data = image_data
         self.height = image_data.shape[0]
@@ -102,12 +104,19 @@ class WebImage():
         # insert fix made in PR for PDL data
         #image_data = image_data.astype(float)
 
-        # check for np.NaN in the array initially
-        if np.isnan(image_data).any():
-            nan_sum_start = np.isnan(image_data).sum()
-            logger.info(f"Sum of np.Nan values found in image_data at start is {nan_sum_start}.")
+        # # check for np.NaN in the array initially
+        # if np.isnan(image_data).any():
+        #     nan_sum_start = np.isnan(image_data).sum()
+        #     logger.info(f"Sum of np.Nan values found in image_data at start is {nan_sum_start}.")
+        # else:
+        #     logger.info("NO np.Nan values are in image_data at start.")
+
+        # check for 999 in the array initially
+        if (image_data == 999).any():
+            sum_start_999 = (image_data == 999).sum()
+            logger.info(f"Sum of nodata_val values of 999 found in image_data at start is {sum_start_999}.")
         else:
-            logger.info("NO np.Nan values are in image_data at start.")
+            logger.info(f"NO nodata_val values of 999 are in image_data at start.")
 
         # create a boolean mask with T when a value is the nodata_val
         # and F when the value is not the nodata_val
@@ -152,6 +161,9 @@ class WebImage():
             logger.info("NO None values are in image_data_scaled.")
 
         logger.info("Converting scaled values to integers...")
+        # NOTE: because the following line errors when the nodata_val is set to nan, consider
+        # instead an if-else statement, so if the value is not nan, convert to int, but 
+        # if it is nan, do float or something similar
         image_data_scaled = image_data_scaled.astype(int)
 
         # replace each value in the matrix with the corresponding color in the

@@ -90,14 +90,14 @@ class Raster():
                 'weight_by': 'count',
                 'property': 'centroids_per_pixel',
                 'aggregation_method': 'sum',
-                'nodata_val': np.nan,
+                'nodata_val': 0,
             },
             {
                 'name': 'coverage',
                 'weight_by': 'area',
                 'property': 'area_per_pixel_area',
                 'aggregation_method': 'sum',
-                'nodata_val': np.nan,
+                'nodata_val': 0,
             }
         ]
 
@@ -177,7 +177,7 @@ class Raster():
                         property in the cell. Method can be any method allowed
                         in the 'func' property of the panda's aggregate method,
                         e.g. 'sum', 'count', 'mean', etc.
-                    nodata_val : int, float, None, or np.nan
+                    nodata_val : int, float, or None
                         The value to apply to cells with no data. This is 
                         pulled from the config. Default is 0.
 
@@ -705,13 +705,13 @@ class Raster():
 
         return area_gdf
 
-    def __create_raster_from_stats_df(self, nodata_val = np.nan):
+    def __create_raster_from_stats_df(self, nodata_val = 0):
         """
             Create a raster in memory from the stats_df.
 
             Parameters
             ----------
-            nodata_val : int, float, None, or np.nan
+            nodata_val : int, float, or None
                 Data to use in array cells with no data. This value is
                 pulled from the config. Default is 0.
 
@@ -783,7 +783,7 @@ class Raster():
         self,
         df=None,
         values_column=None,
-        nodata_val = np.nan
+        nodata_val = 0
     ):
         """
             Convert a dataframe into a 2D array that is the size of the grid
@@ -939,9 +939,15 @@ class Raster():
 
         # The 'source' data is the merged array of all the rasters
         merged_data, merge_transform = merge(rasters)
+
         # Create an array to hold the resampled data in the desired shape.
-        # TODO: The NA values might not always be zero.
-        new_array = np.zeros((count, self.shape[0], self.shape[1]), dtype)
+        # First, fill the cell values that fall outside of the tiles with
+        # the nodata_val specified in the config.
+        # note: nodata_val defaults to 0 here if the key is not found
+        raster_opts = self.config.get_raster_config()
+        nodata_val = raster_opts.get('nodata_val', 0)
+        new_array = np.full((count, self.shape[0], self.shape[1]), nodata_val, dtype)
+        #new_array = np.zeros((count, self.shape[0], self.shape[1]), dtype)
 
         # Resampling each band separately, since each band may have a different
         # resampling method
