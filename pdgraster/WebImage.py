@@ -160,7 +160,6 @@ class WebImage():
         else:
             logger.info("NO None values are in image_data_scaled.")
 
-        logger.info("Converting scaled values to integers...")
         # NOTE: because the following line errors when the nodata_val is set to nan, consider
         # instead an if-else statement, so if the value is not nan, convert to int, but 
         # if it is nan, do float or something similar

@@ -326,12 +326,15 @@ class RasterTiler():
             children = self.tiles.get_child_paths(tile, base_dir='geotiff')
             children = self.tiles.remove_nonexistent_paths(children)
             bounds = self.tiles.get_bounding_box(tile)
+            raster_opts = self.config.get_raster_config()
+            nodata_val = raster_opts.get('stats', [{}])[0].get('nodata_val', 0)
 
             raster = Raster.from_rasters(
                 rasters=children,
                 resampling_methods=self.config.get_resampling_methods(),
                 shape=self.config.get('tile_size'),
-                bounds=bounds
+                bounds=bounds,
+                nodata_val=nodata_val
             )
             raster.write(out_path)
 

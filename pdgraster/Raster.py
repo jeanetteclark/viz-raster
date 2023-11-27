@@ -59,7 +59,7 @@ class Raster():
 
     def __init__(self):
         """
-            Initialize a Raster object.            
+            Initialize a Raster object.
         """
 
         # Set random names for properties that will be created temporarily
@@ -224,6 +224,7 @@ class Raster():
         resampling_methods=('nearest'),
         shape=None,
         bounds=None,
+        nodata_val=0
     ):
         """
             Create a composite raster from a list of raster input paths. The
@@ -269,7 +270,7 @@ class Raster():
         r.bounds = bounds
 
         rasters = r.__get_and_check_rasters(rasters)
-        raster = r.__merge_and_resample(rasters, resampling_methods)
+        raster = r.__merge_and_resample(rasters, resampling_methods, nodata_val)
 
         r.update_properties(raster)
 
@@ -899,7 +900,7 @@ class Raster():
 
         return rasters
 
-    def __merge_and_resample(self, rasters, resampling_methods):
+    def __merge_and_resample(self, rasters, resampling_methods, nodata_val = 0):
         """
             Merge the rasters into a single raster, resample the merged raster
             to the specified shape, and return the resampled raster.
@@ -924,10 +925,12 @@ class Raster():
 
         ref = rasters[0]
 
+        # define the name(s) of the statistic(s)
         descriptions = ref.descriptions
         crs = ref.crs
+        # define the number of bands
         count = ref.count
-        dtype = ref.read().dtype
+        dtype = ref.read().dtype # float64
         if self.shape is None:
             self.shape = ref.shape
 
@@ -938,16 +941,18 @@ class Raster():
         )
 
         # The 'source' data is the merged array of all the rasters
-        merged_data, merge_transform = merge(rasters)
+        merged_data, merge_transform = merge(datasets = rasters,
+                                            nodata = nodata_val)
 
         # Create an array to hold the resampled data in the desired shape.
-        # First, fill the cell values that fall outside of the tiles with
-        # the nodata_val specified in the config.
-        # note: nodata_val defaults to 0 here if the key is not found
-        raster_opts = self.config.get_raster_config()
-        nodata_val = raster_opts.get('nodata_val', 0)
-        new_array = np.full((count, self.shape[0], self.shape[1]), nodata_val, dtype)
-        #new_array = np.zeros((count, self.shape[0], self.shape[1]), dtype)
+        # First, fill the cell values with the nodata_val specified in 
+        # the config.
+        # Note: nodata_val defaults to 0 here if the key is not found
+        #raster_opts = self.config.get_raster_config()
+        #nodata_val = raster_opts.get('nodata_val', 0)
+        new_array = np.full((count, self.shape[0], self.shape[1]), 
+                            fill_value = nodata_val, 
+                            dtype = dtype)
 
         # Resampling each band separately, since each band may have a different
         # resampling method
